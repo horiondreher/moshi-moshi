@@ -1,6 +1,41 @@
 use std::str;
 use std::{env, net};
 
+enum ReqType {
+    Register,
+    Invite,
+    Ack,
+    Bye,
+    Cancel,
+    Update,
+    Refer,
+    Prack,
+    Subscribe,
+    Notify,
+    Publish,
+    Message,
+    Info,
+    Options,
+}
+
+enum ResType {
+    Trying,
+    Ringing,
+    SessionProgress,
+    Ok,
+    BadRequest,
+    Unauthorized,
+    Forbidden,
+    NotFound,
+    RequestTimeout,
+    TemporarilyUnavailable,
+    BusyHere,
+    RequestTerminated,
+    InternalServerError,
+    BadGateway,
+    ServiceUnavailable,
+}
+
 fn main() {
     let host_addr = env::args().nth(1).expect("Invalid host IP address");
     let host_port = env::args().nth(2).expect("Invalid host port");
