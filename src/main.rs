@@ -1,8 +1,7 @@
 use nom::{
-    branch::alt,
-    bytes::complete::{tag, take_until, take_while},
+    bytes::complete::take_while,
     character::complete::{char, space0},
-    combinator::{map, opt},
+    combinator::map,
     sequence::{delimited, separated_pair},
     IResult,
 };
@@ -131,9 +130,6 @@ impl<'a> ReqMessage<'a> {
                 println!("Header - {}", header.name);
                 println!("Value - {}", header.value);
             }
-            // let (_input, header) = ReqMessage::parse_line(line).unwrap();
-            // println!("Header - {}", header.name);
-            // println!("Value - {}", header.value);
         }
 
         ReqMessage {
@@ -154,42 +150,17 @@ impl<'a> ReqMessage<'a> {
     }
 
     fn parse_line(line: &str) -> IResult<&str, Header> {
-        // let parse_header_value = separated_pair(is_field_char, char(':'), parse_field_char);
-
-        // map(parse_header_value, |(header, value)| Header {
-        //     name: header,
-        //     value: value,
-        //     params: None,
-        // })(line)
-
-        let (input, (name, value)) = separated_pair(
-            take_until(":"),
+        let parse_header_value = separated_pair(
+            is_field_char,
             delimited(space0, char(':'), space0),
-            alt((
-                delimited(space0, take_until("\r\n"), opt(tag("\r\n"))),
-                take_until("\r\n"),
-            )),
-        )(line)?;
+            take_while(|c: char| c.is_ascii()),
+        );
 
-        // let header = SipHeader {
-        //     name: name.to_string(),
-        //     value: value.to_string(),
-        // };
-
-        // let (out_line, header_name) = take_while1(is_field_char)(line)?;
-        // let (out_line, value) = take_while(is_whitespace)(out_line)?;
-
-        // println!("Value - {}", out_line);
-        // println!("Value - {}", value);
-
-        Ok((
-            input,
-            Header {
-                name: name,
-                value: value,
-                params: None,
-            },
-        ))
+        map(parse_header_value, |(header, value)| Header {
+            name: header,
+            value: value,
+            params: None,
+        })(line)
     }
 }
 fn main() {
@@ -205,7 +176,6 @@ fn main() {
         Err(e) => panic!("Could not bind to socket. Reason: {}", e),
     };
 
-    let global_message: ReqMessage;
     loop {
         match socket.recv_from(&mut buf) {
             Ok((amt, src)) => {
@@ -215,8 +185,6 @@ fn main() {
                     Ok(valid) => {
                         // println!("{}", valid);
                         let message = ReqMessage::new(valid);
-                        global_message = message;
-                        break;
                     }
                     Err(error) => {
                         println!("Invalid received bytes: {}", error.to_string());
@@ -226,6 +194,4 @@ fn main() {
             Err(e) => println!("Coult not receive message: {}", e),
         }
     }
-
-    println!("{:#?}", global_message.method);
 }
