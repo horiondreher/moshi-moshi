@@ -93,6 +93,7 @@ impl<'a> Uri<'a> {
     /// First this function split the scheme part of URI (sip or sips) using alt, if fails for sip it tries for sips
     /// Second it uses separated_pair to break apart the user from host and port, using '@' for it
     /// Finally split the host and port to store in variables
+    /// TODO: Make it work for ipv6 too
     fn parse(input: &'a str) -> IResult<&str, Self> {
         let (input, scheme) = alt((tag("sip:"), tag("sips:")))(input)?;
         let (_params, (user, host_port)) = separated_pair(alphanumeric0, char('@'), is_any_ascii)(input)?;
@@ -109,6 +110,27 @@ impl<'a> Uri<'a> {
                 params: None,
             },
         ))
+    }
+}
+
+
+fn parse_sip_method(method: &str) -> Option<ReqMethod> {
+    match method {
+        "REGISTER" => Some(ReqMethod::Register),
+        "INVITE" => Some(ReqMethod::Invite),
+        "ACK" => Some(ReqMethod::Ack),
+        "BYE" => Some(ReqMethod::Bye),
+        "CANCEL" => Some(ReqMethod::Cancel),
+        "UPATE" => Some(ReqMethod::Update),
+        "REFER" => Some(ReqMethod::Refer),
+        "PRACK" => Some(ReqMethod::Prack),
+        "SUBSCRIBE" => Some(ReqMethod::Subscribe),
+        "NOTIFY" => Some(ReqMethod::Notify),
+        "PUBLISH" => Some(ReqMethod::Publish),
+        "MESSAGE" => Some(ReqMethod::Message),
+        "INFO" => Some(ReqMethod::Info),
+        "OPTIONS" => Some(ReqMethod::Options),
+        &_ => None
     }
 }
 
@@ -146,8 +168,6 @@ struct ReqMessage<'a> {
     body: Option<Vec<&'a str>>,
 }
 
-
-
 impl<'a> ReqMessage<'a> {
     fn parse(message: &str) -> Result<ReqMessage, SipParseError> {
         let mut lines: Vec<&str> = message.split("\r\n").collect();
@@ -162,6 +182,11 @@ impl<'a> ReqMessage<'a> {
             }
         };
 
+        let enum_method = match parse_sip_method(method) {
+            Some(x) => x,
+            None => return Err(SipParseError)
+        };
+
         let ending =  lines.iter().position(|&x| x == "");
         let body_values = match ending {
             Some(end_pos) => Some(lines.drain(end_pos..).collect()),
@@ -169,11 +194,8 @@ impl<'a> ReqMessage<'a> {
         };
 
         for line in &lines {
-            println!("{}", line);
             let (_input, header) = match ReqMessage::parse_header(line) {
                 Ok((_input, header)) => {
-                    println!("Header - {}", header.name);
-                    println!("Value - {}\n", header.value);
                     (_input, header)
                 }
                 Err(e) => {
@@ -184,7 +206,7 @@ impl<'a> ReqMessage<'a> {
         }
 
         Ok(ReqMessage {
-            method: ReqMethod::Invite,
+            method: enum_method,
             direction: ReqDirection::In,
             uri: uri,
             version: version,
@@ -244,7 +266,6 @@ fn main() {
                 println!("src: {}", src);
                 match str::from_utf8(&buf) {
                     Ok(valid) => {
-                        // println!("{}", valid);
                         let message = ReqMessage::parse(valid);
                     }
                     Err(error) => {
