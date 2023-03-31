@@ -19,7 +19,7 @@ impl fmt::Display for SipParseError {
     }
 }
 
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::{net::{SocketAddr, ToSocketAddrs}, collections::HashMap};
 use std::str;
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -145,17 +145,40 @@ struct Header<'a> {
     params: Option<BTreeMap<&'a str, Param<'a>>>,
 }
 
-struct Headers<'a> {
-    via: VecDeque<Header<'a>>,
-    max_forwards: Header<'a>,
-    from: Header<'a>,
-    to: Header<'a>,
-    call_id: Header<'a>,
-    cseq: Header<'a>,
-    contact: Header<'a>,
-    content_type: Header<'a>,
-    content_length: Header<'a>,
-}
+// struct Headers<'a> {
+//     via: VecDeque<Header<'a>>,
+//     max_forwards: Header<'a>,
+//     from: Header<'a>,
+//     to: Header<'a>,
+//     call_id: Header<'a>,
+//     cseq: Header<'a>,
+//     contact: Header<'a>,
+//     content_type: Header<'a>,
+//     content_length: Header<'a>,
+//     extensions: Option<BTreeMap<&'a str, &'a str>>
+// }
+
+// impl<'a> Headers<'a> {
+//     fn parse(header: &str, value: &'a str) -> Self {
+//             match header {
+//                 "Via" => Some(ReqMethod::Register),
+//                 "INVITE" => Some(ReqMethod::Invite),
+//                 "ACK" => Some(ReqMethod::Ack),
+//                 "BYE" => Some(ReqMethod::Bye),
+//                 "CANCEL" => Some(ReqMethod::Cancel),
+//                 "UPATE" => Some(ReqMethod::Update),
+//                 "REFER" => Some(ReqMethod::Refer),
+//                 "PRACK" => Some(ReqMethod::Prack),
+//                 "SUBSCRIBE" => Some(ReqMethod::Subscribe),
+//                 "NOTIFY" => Some(ReqMethod::Notify),
+//                 "PUBLISH" => Some(ReqMethod::Publish),
+//                 "MESSAGE" => Some(ReqMethod::Message),
+//                 "INFO" => Some(ReqMethod::Info),
+//                 "OPTIONS" => Some(ReqMethod::Options),
+//                 &_ => None
+//         }
+//     }
+// }
 
 // #[derive(Default, Debug)]
 // #[derive(Debug)]
@@ -164,14 +187,14 @@ struct ReqMessage<'a> {
     direction: ReqDirection,
     uri: Uri<'a>,
     version: &'a str,
-    headers: Option<Headers<'a>>,
+    headers: HashMap<String, VecDeque<Header<'a>>>,
     body: Option<Vec<&'a str>>,
 }
 
+/// TODO: make better parsing errors
 impl<'a> ReqMessage<'a> {
     fn parse(message: &str) -> Result<ReqMessage, SipParseError> {
         let mut lines: Vec<&str> = message.split("\r\n").collect();
-        let mut headers: Headers;
 
         let uri_line = lines.remove(0);
         let (method, uri, version) = match ReqMessage::parse_request_uri(uri_line) {
@@ -193,16 +216,21 @@ impl<'a> ReqMessage<'a> {
             None => None
         };
 
+        let mut headers: HashMap<String, VecDeque<Header>> = HashMap::new();
+
         for line in &lines {
-            let (_input, header) = match ReqMessage::parse_header(line) {
-                Ok((_input, header)) => {
-                    (_input, header)
+            let header = match ReqMessage::parse_header(line) {
+                Ok((_input,header)) => {
+                    header
                 }
                 Err(e) => {
                     println!("Error: {}", e);
                     continue;
                 }
             };
+            
+            // TODO: I am creating 2 Headers here
+            headers.entry(header.name.to_owned()).or_default().push_back(header);
         }
 
         Ok(ReqMessage {
@@ -210,7 +238,7 @@ impl<'a> ReqMessage<'a> {
             direction: ReqDirection::In,
             uri: uri,
             version: version,
-            headers: None,
+            headers: headers,
             body: body_values,
         })
     }
@@ -240,11 +268,33 @@ impl<'a> ReqMessage<'a> {
 
         // Transforms the parser into a Header struct
         map(header_value, |(header, value)| Header {
-            name: header,
-            value: value,
-            params: None,
-        })(line)
+                name: header,
+                value: value,
+                params: None
+            },
+        )(line)
     }
+
+    fn match_header_name(name: &str) -> Option<ReqMethod> {
+        match name {
+                "VIA" => Some(ReqMethod::Register),
+                "INVITE" => Some(ReqMethod::Invite),
+                "ACK" => Some(ReqMethod::Ack),
+                "BYE" => Some(ReqMethod::Bye),
+                "CANCEL" => Some(ReqMethod::Cancel),
+                "UPATE" => Some(ReqMethod::Update),
+                "REFER" => Some(ReqMethod::Refer),
+                "PRACK" => Some(ReqMethod::Prack),
+                "SUBSCRIBE" => Some(ReqMethod::Subscribe),
+                "NOTIFY" => Some(ReqMethod::Notify),
+                "PUBLISH" => Some(ReqMethod::Publish),
+                "MESSAGE" => Some(ReqMethod::Message),
+                "INFO" => Some(ReqMethod::Info),
+                "OPTIONS" => Some(ReqMethod::Options),
+                &_ => None
+        }
+    }
+
 }
 fn main() {
     let host_addr = env::args().nth(1).expect("Invalid host IP address");
@@ -267,6 +317,9 @@ fn main() {
                 match str::from_utf8(&buf) {
                     Ok(valid) => {
                         let message = ReqMessage::parse(valid);
+
+                        println!("{}", message.as_ref().unwrap().headers.get("Via").unwrap().get(0).unwrap().value);
+                        println!("{}", message.as_ref().unwrap().headers.get("From").unwrap().get(0).unwrap().value);
                     }
                     Err(error) => {
                         println!("Invalid received bytes: {}", error.to_string());
