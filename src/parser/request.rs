@@ -58,7 +58,6 @@ impl<'a> ReqMessage<'a> {
                 }
             };
 
-            // TODO: I am creating 2 Headers here
             headers
                 .entry(header.name.to_owned())
                 .or_default()
@@ -102,6 +101,19 @@ impl<'a> ReqMessage<'a> {
             "INFO" => Some(ReqMethod::Info),
             "OPTIONS" => Some(ReqMethod::Options),
             &_ => None,
+        }
+    }
+
+    pub fn get_single_header(&self, name: &str) -> Option<&Header> {
+        match self.headers.get(name) {
+            Some(s) => {
+                if s.len() == 1 {
+                    Some(&s[0])
+                } else {
+                    None
+                }
+            }
+            None => None
         }
     }
 }

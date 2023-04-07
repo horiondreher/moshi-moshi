@@ -1,8 +1,9 @@
+#![allow(dead_code)]
+
 mod parser;
 
-use std::{env, net, str};
-// use parser::request::{ReqMessage};
 use parser::SipRequest;
+use std::{env, net, str};
 
 fn main() {
     let host_addr = env::args().nth(1).expect("Invalid host IP address");
@@ -19,36 +20,13 @@ fn main() {
 
     loop {
         match socket.recv_from(&mut buf) {
-            Ok((amt, src)) => {
-                println!("amt {}", amt);
-                println!("src: {}", src);
+            Ok((_amt, _src)) => {
                 match str::from_utf8(&buf) {
                     Ok(valid) => {
-                        let message = SipRequest::parse(valid);
-
+                        let message = SipRequest::parse(valid.clone());
                         println!(
                             "{}",
-                            message
-                                .as_ref()
-                                .unwrap()
-                                .headers
-                                .get("Via")
-                                .unwrap()
-                                .get(0)
-                                .unwrap()
-                                .value
-                        );
-                        println!(
-                            "{}",
-                            message
-                                .as_ref()
-                                .unwrap()
-                                .headers
-                                .get("From")
-                                .unwrap()
-                                .get(0)
-                                .unwrap()
-                                .value
+                            message.as_ref().unwrap().get_single_header("Via").unwrap().value
                         );
                     }
                     Err(error) => {
