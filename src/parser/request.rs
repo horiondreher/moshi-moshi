@@ -113,7 +113,7 @@ impl<'a> ReqMessage<'a> {
                     None
                 }
             }
-            None => None
+            None => None,
         }
     }
 }
