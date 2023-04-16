@@ -3,8 +3,8 @@
 mod parser;
 
 use parser::SipRequest;
-use std::{env, net, str};
 use std::fmt::Write;
+use std::{env, net, str};
 
 fn main() {
     let host_addr = env::args().nth(1).expect("Invalid host IP address");
@@ -28,18 +28,34 @@ fn main() {
                         Err(_e) => continue,
                     };
 
-                    println!("Source: {}", src);
+                    println!("Source: {:#?}", message);
                     println!("{}", message.get_single_header("Call-ID").unwrap().value);
 
                     let call_id = message.get_single_header("Call-ID").unwrap().value;
 
                     let mut response = "SIP/2.0 180 Ringing\r\n".to_string();
-                    write!(response, "Via: SIP/2.0/UDP 192.168.1.146:5070;branch=z9hG4bK-10274-1-0\r\n").unwrap();
-                    write!(response, "From: sipp <sip:sipp@192.168.1.146:5070>;tag=10274SIPpTag001\r\n").unwrap();
-                    write!(response, "To: service <sip:service@{host_addr}:{port}>;tag=10273SIPpTag011\r\n").unwrap();
+                    write!(
+                        response,
+                        "Via: SIP/2.0/UDP 192.168.1.146:5070;branch=z9hG4bK-10274-1-0\r\n"
+                    )
+                    .unwrap();
+                    write!(
+                        response,
+                        "From: sipp <sip:sipp@192.168.1.146:5070>;tag=10274SIPpTag001\r\n"
+                    )
+                    .unwrap();
+                    write!(
+                        response,
+                        "To: service <sip:service@{host_addr}:{port}>;tag=10273SIPpTag011\r\n"
+                    )
+                    .unwrap();
                     write!(response, "Call-ID: {call_id}\r\n").unwrap();
                     write!(response, "CSeq: 1 INVITE\r\n").unwrap();
-                    write!(response, "Contact: <sip:{host_addr}:{port};transport=UDP>\r\n").unwrap();
+                    write!(
+                        response,
+                        "Contact: <sip:{host_addr}:{port};transport=UDP>\r\n"
+                    )
+                    .unwrap();
                     write!(response, "Content-Length: 0\r\n\r\n").unwrap();
 
                     socket.send_to(response.as_bytes(), src).unwrap();

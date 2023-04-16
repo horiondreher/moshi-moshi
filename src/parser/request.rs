@@ -12,7 +12,7 @@ use std::{collections::VecDeque, fmt};
 use super::{header::Header, uri::Uri};
 
 // #[derive(Default, Debug)]
-// #[derive(Debug)]
+#[derive(Debug)]
 pub struct ReqMessage<'a> {
     pub method: ReqMethod,
     pub direction: ReqDirection,
@@ -22,7 +22,6 @@ pub struct ReqMessage<'a> {
     pub body: Option<Vec<&'a str>>,
 }
 
-/// TODO: make better parsing errors
 impl<'a> ReqMessage<'a> {
     pub fn parse(message: &str) -> Result<ReqMessage, SipParseError> {
         let mut lines: Vec<&str> = message.split("\r\n").collect();
@@ -32,18 +31,23 @@ impl<'a> ReqMessage<'a> {
             Ok((_, (method, uri, version))) => (method, uri, version),
             Err(e) => {
                 println!("Error: {}", e);
-                return Err(SipParseError);
+                return Err(SipParseError::new(1, Some("Invalid URI")));
             }
         };
 
         let enum_method = match parse_sip_method(method) {
             Some(x) => x,
-            None => return Err(SipParseError),
+            None => return Err(SipParseError::new(1, Some("Invalid request message"))),
         };
 
+        // Separates body from request checking for whitespace and draining string to
+        // body_values. Also check if any position has \0 value
         let ending = lines.iter().position(|&x| x == "");
         let body_values = match ending {
-            Some(end_pos) => Some(lines.drain(end_pos..).collect()),
+            Some(end_pos) => {
+                let body_lines = lines.drain(end_pos..).filter(|x| !x.starts_with("\0"));
+                Some(body_lines.collect())
+            }
             None => None,
         };
 
@@ -91,7 +95,7 @@ impl<'a> ReqMessage<'a> {
             "ACK" => Some(ReqMethod::Ack),
             "BYE" => Some(ReqMethod::Bye),
             "CANCEL" => Some(ReqMethod::Cancel),
-            "UPATE" => Some(ReqMethod::Update),
+            "UPDATE" => Some(ReqMethod::Update),
             "REFER" => Some(ReqMethod::Refer),
             "PRACK" => Some(ReqMethod::Prack),
             "SUBSCRIBE" => Some(ReqMethod::Subscribe),
@@ -119,11 +123,23 @@ impl<'a> ReqMessage<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct SipParseError;
+pub struct SipParseError<'a> {
+    pub code: u32,
+    pub message: Option<&'a str>,
+}
 
-impl fmt::Display for SipParseError {
+impl<'a> fmt::Display for SipParseError<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Invalid SIP message format")
+    }
+}
+
+impl<'a> SipParseError<'a> {
+    pub fn new(code: u32, message: Option<&'a str>) -> SipParseError {
+        SipParseError {
+            code: code,
+            message: message,
+        }
     }
 }
 
@@ -163,6 +179,7 @@ pub enum ResType {
     ServiceUnavailable,
 }
 
+#[derive(Debug)]
 pub enum ReqDirection {
     In,
     Out,

@@ -10,6 +10,7 @@ use nom::{
 
 use super::{common::sip_chars::is_any_ascii, param::Param};
 
+#[derive(Debug)]
 pub struct Uri<'a> {
     display_name: Option<&'a str>,
     scheme: &'a str,
