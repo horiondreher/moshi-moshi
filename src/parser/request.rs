@@ -24,6 +24,7 @@ pub struct ReqMessage<'a> {
 
 impl<'a> ReqMessage<'a> {
     pub fn parse(message: &str) -> Result<ReqMessage, SipParseError> {
+        // TODO: maybe change this to parse with nom too
         let mut lines: Vec<&str> = message.split("\r\n").collect();
 
         let uri_line = lines.remove(0);

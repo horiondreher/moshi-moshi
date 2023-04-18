@@ -1,6 +1,6 @@
 mod request;
 
-pub use request::ReqMessage as SipRequest;
+pub use request::*;
 
 mod common;
 mod header;
