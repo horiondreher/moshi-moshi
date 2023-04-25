@@ -89,6 +89,7 @@ impl<'a> ReqMessage<'a> {
         Ok((output, (method, uri, version)))
     }
 
+    // TODO: impl From
     fn match_header_name(name: &str) -> Option<ReqMethod> {
         match name {
             "VIA" => Some(ReqMethod::Register),

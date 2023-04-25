@@ -26,15 +26,22 @@ fn main() {
         Err(e) => panic!("Could not bind to socket. Reason: {}", e),
     };
 
+    let mut calls = Calls::new();
+
     loop {
         match socket.recv_from(&mut buf) {
             Ok((_amt, src)) => match str::from_utf8(&buf) {
                 Ok(valid) => {
-                    let response = Calls::handle_sip_message(&src, &valid);
+                    let responses: Result<Vec<String>, moshi_moshi::SipError> =
+                        calls.handle_sip_message(&src, &valid);
 
-                    match response {
-                        Some(x) => socket.send_to(x.as_bytes(), src).unwrap(),
-                        None => continue,
+                    match responses {
+                        Ok(x) => {
+                            for response in x.iter() {
+                                socket.send_to(response.as_bytes(), src).unwrap();
+                            }
+                        }
+                        Err(e) => continue,
                     };
                 }
                 Err(error) => {

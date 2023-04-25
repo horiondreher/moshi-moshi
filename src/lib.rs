@@ -3,59 +3,43 @@
 // TODO: resolve this in lib and main
 mod parser;
 
-use parser::{ReqMessage, ReqMethod};
+use parser::ReqMessage;
 use std::collections::HashMap;
-use std::fmt::Write;
+use std::fmt::{self, Write};
+use std::hash::Hash;
 use std::net::SocketAddr;
 
+#[derive(Debug)]
+pub enum SipError {
+    ResponseMessage,
+}
+
+impl fmt::Display for SipError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            SipError::ResponseMessage => {
+                write!(f, "Could not create response for provided request")
+            }
+        }
+    }
+}
+
 enum CallState {
+    Initializing,
     Trying,
     InProgress,
     Ending,
 }
 
-pub struct SipCall {
+pub struct Call {
     state: CallState,
     call_id: String,
     source: SocketAddr,
 }
 
-impl SipCall {}
-
-pub struct Calls {
-    sip_calls: HashMap<String, SipCall>,
-}
-
-impl<'a> Calls {
-    fn push(message: &ReqMessage) {
-        todo!()
-    }
-    fn find(message: &ReqMessage) -> Option<CallState> {
-        todo!()
-    }
-
-    pub fn handle_sip_message(src_socket: &SocketAddr, message: &str) -> Option<String> {
-        let message = match ReqMessage::parse(message) {
-            Ok(x) => x,
-            Err(_e) => return None,
-        };
-
-        let response: String = Self::handle_request(&src_socket, &message);
-
-        Some(response)
-    }
-
-    pub fn handle_request(src: &SocketAddr, message: &'a ReqMessage) -> String {
-        let state = match message.method {
-            ReqMethod::Invite => Self::handle_invite(message),
-            _ => Self::find(message),
-        };
-
-        let call_id = message.get_single_header("Call-ID").unwrap().value;
-
-        let mut response = "SIP/2.0 180 Ringing\r\n".to_string();
-        let host_addr = src.ip();
-        let port = src.port();
+impl Call {
+    pub fn create_response(&self, response_type: &str) -> String {
+        let mut response = response_type.to_string();
 
         write!(
             response,
@@ -69,22 +53,111 @@ impl<'a> Calls {
         .unwrap();
         write!(
             response,
-            "To: service <sip:service@{host_addr}:{port}>;tag=10273SIPpTag011\r\n"
+            "To: service <sip:service@{}:{}>;tag=10273SIPpTag011\r\n",
+            self.source.ip(),
+            self.source.port()
         )
         .unwrap();
-        write!(response, "Call-ID: {call_id}\r\n").unwrap();
+        write!(response, "Call-ID: {}\r\n", self.call_id).unwrap();
         write!(response, "CSeq: 1 INVITE\r\n").unwrap();
         write!(
             response,
-            "Contact: <sip:{host_addr}:{port};transport=UDP>\r\n"
+            "Contact: <sip:{}:{};transport=UDP>\r\n",
+            self.source.ip(),
+            self.source.port()
         )
         .unwrap();
         write!(response, "Content-Length: 0\r\n\r\n").unwrap();
 
-        response
+        return response;
+    }
+}
+
+pub struct Calls {
+    sip_calls: HashMap<String, Call>,
+}
+
+impl<'a> Calls {
+    pub fn new() -> Self {
+        Calls {
+            sip_calls: HashMap::new(),
+        }
     }
 
-    fn handle_invite(message: &ReqMessage) -> Option<CallState> {
+    pub fn handle_sip_message(
+        &mut self,
+        src_socket: &SocketAddr,
+        message: &str,
+    ) -> Result<Vec<String>, SipError> {
+        let message = match ReqMessage::parse(message) {
+            Ok(x) => x,
+            Err(_e) => return Err(SipError::ResponseMessage),
+        };
+
+        let response = self.handle_request(&src_socket, &message);
+
+        Ok(response)
+    }
+
+    pub fn handle_request(&mut self, src: &SocketAddr, message: &'a ReqMessage) -> Vec<String> {
+        //TODO: create classes for registers and options
+        let call_opt = self.find(message);
+
+        // TODO: there is gotta be a way to improve this
+        let call: &mut Call = match call_opt {
+            Some(x) => x,
+            None => {
+                let call_id = message.get_single_header("Call-ID").unwrap().value;
+                self.sip_calls.insert(
+                    call_id.to_owned(),
+                    Call {
+                        state: CallState::Initializing,
+                        call_id: call_id.to_owned(),
+                        source: src.clone(),
+                    },
+                );
+                self.sip_calls.get_mut(call_id).unwrap()
+            }
+        };
+        // let call = self.find(message).unwrap_or(self.create_call(message));
+
+        // TODO: create states
+        let mut responses: Vec<String> = Vec::new();
+        match call.state {
+            CallState::Initializing => {
+                responses.push(call.create_response("SIP/2.0 180 Ringing\r\n"));
+                responses.push(call.create_response("SIP/2.0 200 OK\r\n"));
+                call.state = CallState::InProgress;
+            }
+            CallState::Trying => {
+                responses.push(call.create_response("SIP/2.0 180 Ringing\r\n"));
+            }
+            CallState::InProgress => {
+                responses.push(call.create_response("SIP/2.0 200 OK\r\n"));
+            }
+            CallState::Ending => {
+                responses.push(call.create_response("SIP/2.0 180 Ringing\r\n"));
+            }
+        };
+
+        responses
+    }
+
+    fn create_call(&mut self, _message: &ReqMessage) -> &mut Call {
         todo!()
+    }
+
+    fn push(_message: &ReqMessage) {
+        todo!()
+    }
+
+    fn find(&mut self, message: &ReqMessage) -> Option<&mut Call> {
+        let call_id = message.get_single_header("Call-ID");
+
+        if let Some(x) = call_id {
+            return self.sip_calls.get_mut(x.value);
+        }
+
+        return None;
     }
 }
