@@ -3,7 +3,7 @@
 // TODO: resolve this in lib and main
 mod parser;
 
-use parser::ReqMessage;
+use parser::{ReqMessage, ReqMethod};
 use std::collections::HashMap;
 use std::fmt::{self, Write};
 use std::hash::Hash;
@@ -123,23 +123,19 @@ impl<'a> Calls {
 
         // TODO: create states
         let mut responses: Vec<String> = Vec::new();
-        match call.state {
-            CallState::Initializing => {
-                responses.push(call.create_response("SIP/2.0 180 Ringing\r\n"));
+
+        match message.method {
+            ReqMethod::Invite => {
+                responses.push(call.create_response("SIP/2.0 183 Session Progress\r\n"));
                 responses.push(call.create_response("SIP/2.0 200 OK\r\n"));
                 call.state = CallState::InProgress;
-            }
-            CallState::Trying => {
-                responses.push(call.create_response("SIP/2.0 180 Ringing\r\n"));
-            }
-            CallState::InProgress => {
+            },
+            ReqMethod::Bye => {
                 responses.push(call.create_response("SIP/2.0 200 OK\r\n"));
+                call.state = CallState::Ending;
             }
-            CallState::Ending => {
-                responses.push(call.create_response("SIP/2.0 180 Ringing\r\n"));
-            }
-        };
-
+            _ => ()
+        }
         responses
     }
 
