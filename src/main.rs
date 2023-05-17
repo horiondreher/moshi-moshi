@@ -41,7 +41,7 @@ fn main() {
                                 socket.send_to(response.as_bytes(), src).unwrap();
                             }
                         }
-                        Err(e) => continue,
+                        Err(_e) => continue,
                     };
                 }
                 Err(error) => {

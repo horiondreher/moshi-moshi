@@ -3,10 +3,9 @@
 // TODO: resolve this in lib and main
 mod parser;
 
-use parser::{ReqMessage, ReqMethod};
+use parser::{ReqMessage, ReqMethod, ResType};
 use std::collections::HashMap;
 use std::fmt::{self, Write};
-use std::hash::Hash;
 use std::net::SocketAddr;
 
 #[derive(Debug)]
@@ -24,6 +23,12 @@ impl fmt::Display for SipError {
     }
 }
 
+impl From<std::fmt::Error> for SipError {
+    fn from(_error: std::fmt::Error) -> Self {
+        SipError::ResponseMessage
+    }
+}
+
 enum CallState {
     Initializing,
     Trying,
@@ -33,43 +38,44 @@ enum CallState {
 
 pub struct Call {
     state: CallState,
+    cseq: u32,
     call_id: String,
     source: SocketAddr,
 }
 
 impl Call {
-    pub fn create_response(&self, response_type: &str) -> String {
-        let mut response = response_type.to_string();
+    pub fn create_response(&self, response_type: ResType, request: &str) -> Result<String, SipError> {
+        let mut response = String::from("SIP/2.0 ");
 
+        write!(response, "{}\r\n", response_type)?;
         write!(
             response,
             "Via: SIP/2.0/UDP 192.168.1.146:5070;branch=z9hG4bK-10274-1-0\r\n"
-        )
-        .unwrap();
+        )?;
+
         write!(
             response,
             "From: sipp <sip:sipp@192.168.1.146:5070>;tag=10274SIPpTag001\r\n"
-        )
-        .unwrap();
+        )?;
+
         write!(
             response,
             "To: service <sip:service@{}:{}>;tag=10273SIPpTag011\r\n",
             self.source.ip(),
             self.source.port()
-        )
-        .unwrap();
-        write!(response, "Call-ID: {}\r\n", self.call_id).unwrap();
-        write!(response, "CSeq: 1 INVITE\r\n").unwrap();
+        )?;
+
+        write!(response, "Call-ID: {}\r\n", self.call_id)?;
+        write!(response, "CSeq: {} {}\r\n", self.cseq, request)?;
         write!(
             response,
             "Contact: <sip:{}:{};transport=UDP>\r\n",
             self.source.ip(),
             self.source.port()
-        )
-        .unwrap();
-        write!(response, "Content-Length: 0\r\n\r\n").unwrap();
+        )?;
+        write!(response, "Content-Length: 0\r\n\r\n")?;
 
-        return response;
+        return Ok(response);
     }
 }
 
@@ -112,6 +118,7 @@ impl<'a> Calls {
                     call_id.to_owned(),
                     Call {
                         state: CallState::Initializing,
+                        cseq: 0,
                         call_id: call_id.to_owned(),
                         source: src.clone(),
                     },
@@ -124,17 +131,26 @@ impl<'a> Calls {
         // TODO: create states
         let mut responses: Vec<String> = Vec::new();
 
+        call.cseq = message.get_cseq_number().unwrap();
+
+        // TODO: create fmt::Display for Requests
         match message.method {
             ReqMethod::Invite => {
-                responses.push(call.create_response("SIP/2.0 183 Session Progress\r\n"));
-                responses.push(call.create_response("SIP/2.0 200 OK\r\n"));
+                if let Ok(session_progress) = call.create_response(ResType::SessionProgress, "INVITE") {
+                    responses.push(session_progress);
+                };
+                if let Ok(ok_res) = call.create_response(ResType::Ok, "INVITE") {
+                    responses.push(ok_res);
+                };
                 call.state = CallState::InProgress;
-            },
+            }
             ReqMethod::Bye => {
-                responses.push(call.create_response("SIP/2.0 200 OK\r\n"));
+                if let Ok(ok_res) = call.create_response(ResType::Ok, "BYE") {
+                    responses.push(ok_res);
+                };
                 call.state = CallState::Ending;
             }
-            _ => ()
+            _ => (),
         }
         responses
     }
