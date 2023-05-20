@@ -3,6 +3,7 @@
 // TODO: resolve this in lib and main
 mod parser;
 
+use parser::cseq::CSeq;
 use parser::{ReqMessage, ReqMethod, ResType};
 use std::collections::HashMap;
 use std::fmt::{self, Write};
@@ -44,7 +45,11 @@ pub struct Call {
 }
 
 impl Call {
-    pub fn create_response(&self, response_type: ResType, request: &str) -> Result<String, SipError> {
+    pub fn create_response(
+        &self,
+        response_type: ResType,
+        request: ReqMethod,
+    ) -> Result<String, SipError> {
         let mut response = String::from("SIP/2.0 ");
 
         write!(response, "{}\r\n", response_type)?;
@@ -131,21 +136,24 @@ impl<'a> Calls {
         // TODO: create states
         let mut responses: Vec<String> = Vec::new();
 
-        call.cseq = message.get_cseq_number().unwrap();
+        let cseq_str = message.get_single_header("CSeq").unwrap().value;
+        call.cseq = cseq_str.parse::<CSeq>().unwrap().number;
 
-        // TODO: create fmt::Display for Requests
+        // TODO: pass matched method to function automatically
         match message.method {
             ReqMethod::Invite => {
-                if let Ok(session_progress) = call.create_response(ResType::SessionProgress, "INVITE") {
+                if let Ok(session_progress) =
+                    call.create_response(ResType::SessionProgress, ReqMethod::Invite)
+                {
                     responses.push(session_progress);
                 };
-                if let Ok(ok_res) = call.create_response(ResType::Ok, "INVITE") {
+                if let Ok(ok_res) = call.create_response(ResType::Ok, ReqMethod::Invite) {
                     responses.push(ok_res);
                 };
                 call.state = CallState::InProgress;
             }
             ReqMethod::Bye => {
-                if let Ok(ok_res) = call.create_response(ResType::Ok, "BYE") {
+                if let Ok(ok_res) = call.create_response(ResType::Ok, ReqMethod::Bye) {
                     responses.push(ok_res);
                 };
                 call.state = CallState::Ending;

@@ -1,7 +1,7 @@
 use nom::{
     bytes::complete::take_until,
-    character::complete::{alphanumeric0, digit1, space0},
-    error::{Error, ErrorKind, ParseError},
+    character::complete::{alphanumeric0, space0},
+    error::{ErrorKind, ParseError},
     sequence::separated_pair,
     IResult,
 };
@@ -101,32 +101,7 @@ impl<'a> ReqMessage<'a> {
             None => None,
         }
     }
-    // TODO: change this in structs that derive a trait from header, parsing individually
-    pub fn get_cseq_number(&self) -> Result<u32, SipParseError> {
-        // TODO: remove this nested match
-        match self.get_single_header("CSeq") {
-            Some(cseq) => match Self::parse_cseq(cseq.value) {
-                Ok((_, cseq_number)) => Ok(cseq_number),
-                Err(e) => Err(SipParseError::new(
-                    1,
-                    Some("Could not parse CSeq".to_owned()),
-                )),
-            },
-            None => Err(SipParseError::new(
-                1,
-                Some("CSeq header not found".to_owned()),
-            )),
-        }
-    }
-
-    fn parse_cseq(cseq: &str) -> IResult<&str, u32> {
-        let (output, (cseq_number, _)) = separated_pair(digit1, space0, alphanumeric0)(cseq)?;
-
-        match cseq_number.parse::<u32>() {
-            Ok(x) => Ok((output, x)),
-            Err(e) => Err(nom::Err::Error(Error::new(cseq, ErrorKind::Digit))),
-        }
-    }
+    
 }
 
 #[derive(Debug, Clone)]
@@ -219,6 +194,27 @@ impl FromStr for ReqMethod {
                 code: 2,
                 message: Some("Invalid Request Method".to_owned()),
             }),
+        }
+    }
+}
+
+impl fmt::Display for ReqMethod{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ReqMethod::Register => write!(f, "REGISTER"),
+            ReqMethod::Invite => write!(f, "INVITE"),
+            ReqMethod::Ack => write!(f, "ACK"),
+            ReqMethod::Bye => write!(f, "BYE"),
+            ReqMethod::Cancel => write!(f, "CANCEL"),
+            ReqMethod::Update => write!(f, "UPDATE"),
+            ReqMethod::Refer => write!(f, "REFER"),
+            ReqMethod::Prack => write!(f, "PRACK"),
+            ReqMethod::Subscribe => write!(f, "SUBSCRIBE"),
+            ReqMethod::Notify => write!(f, "NOTIFY"),
+            ReqMethod::Publish => write!(f, "PUBLISH"),
+            ReqMethod::Message => write!(f, "MESSAGE"),
+            ReqMethod::Info => write!(f, "INFO"),
+            ReqMethod::Options => write!(f, "OPTIONS"),
         }
     }
 }
