@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-// TODO: resolve this in lib and main
 mod parser;
 
 use parser::cseq::CSeq;

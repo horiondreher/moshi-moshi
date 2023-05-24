@@ -101,7 +101,6 @@ impl<'a> ReqMessage<'a> {
             None => None,
         }
     }
-    
 }
 
 #[derive(Debug, Clone)]
@@ -198,7 +197,7 @@ impl FromStr for ReqMethod {
     }
 }
 
-impl fmt::Display for ReqMethod{
+impl fmt::Display for ReqMethod {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ReqMethod::Register => write!(f, "REGISTER"),

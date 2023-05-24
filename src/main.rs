@@ -1,13 +1,13 @@
 #![allow(dead_code)]
 
-mod parser;
-
 use moshi_moshi::Calls;
 use std::{
     env,
-    net::{ToSocketAddrs, UdpSocket},
-    str,
+    net::{SocketAddr, ToSocketAddrs, UdpSocket},
+    str, thread, sync::mpsc,
 };
+
+type Job = Box<dyn FnOnce() + Send + 'static>;
 
 fn main() {
     let host_addr = env::args().nth(1).expect("Invalid host IP address");
@@ -28,27 +28,37 @@ fn main() {
 
     let mut calls = Calls::new();
 
-    loop {
-        match socket.recv_from(&mut buf) {
-            Ok((_amt, src)) => match str::from_utf8(&buf) {
-                Ok(valid) => {
-                    let responses: Result<Vec<String>, moshi_moshi::SipError> =
-                        calls.handle_sip_message(&src, &valid);
+    let (sender, receiver) = mpsc::channel();
 
-                    match responses {
-                        Ok(x) => {
-                            for response in x.iter() {
-                                socket.send_to(response.as_bytes(), src).unwrap();
-                            }
-                        }
-                        Err(_e) => continue,
-                    };
-                }
-                Err(error) => {
-                    println!("Invalid received bytes: {}", error.to_string());
-                }
-            },
-            Err(e) => println!("Coult not receive message: {}", e),
+    receiver_thread(receiver);
+
+    loop {
+        if let Ok((_, src)) = socket.recv_from(&mut buf) {
+            // sender.as_ref().send(Box::new(|| {
+            //     handle_connection(&socket, &mut calls, &mut buf, src);
+            // }));
+            handle_connection(&socket, &mut calls, &mut buf, src);
+        } 
+    }
+}
+
+fn handle_connection(socket: &UdpSocket, calls: &mut Calls, buf: &mut Vec<u8>, src: SocketAddr) {
+    let message = str::from_utf8(&buf).unwrap_or_default();
+
+    let responses = calls.handle_sip_message(&src, &message);
+
+    if let Ok(x) = responses {
+        for response in x.iter() {
+            socket.send_to(response.as_bytes(), src).unwrap();
         }
     }
+}
+
+fn receiver_thread(receiver: mpsc::Receiver<Job>) {
+    thread::spawn(move || loop {
+        let job = receiver.recv().unwrap();
+
+        job();
+    });
+   
 }
