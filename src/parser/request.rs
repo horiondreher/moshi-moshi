@@ -42,10 +42,10 @@ impl<'a> ReqMessage<'a> {
 
         // Separates body from request checking for whitespace and draining string to
         // body_values. Also check if any position has \0 value
-        let ending = lines.iter().position(|&x| x == "");
+        let ending = lines.iter().position(|&x| x.is_empty());
         let body_values = match ending {
             Some(end_pos) => {
-                let body_lines = lines.drain(end_pos..).filter(|x| !x.starts_with("\0"));
+                let body_lines = lines.drain(end_pos..).filter(|x| !x.starts_with('\0'));
                 Some(body_lines.collect())
             }
             None => None,
@@ -71,9 +71,9 @@ impl<'a> ReqMessage<'a> {
         Ok(ReqMessage {
             method: enum_method,
             direction: ReqDirection::In,
-            uri: uri,
-            version: version,
-            headers: headers,
+            uri,
+            version,
+            headers,
             body: body_values,
         })
     }
@@ -145,10 +145,7 @@ impl ParseError<&str> for SipParseError {
 
 impl SipParseError {
     pub fn new(code: u32, message: Option<String>) -> SipParseError {
-        SipParseError {
-            code: code,
-            message: message,
-        }
+        SipParseError { code, message }
     }
 }
 

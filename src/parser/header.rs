@@ -37,7 +37,7 @@ impl<'a> Header<'a> {
         // Transforms the parser into a Header struct
         map(header_value, |(header, value)| Header {
             name: header,
-            value: value,
+            value,
             params: None,
         })(line)
     }

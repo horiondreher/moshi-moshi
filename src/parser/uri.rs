@@ -37,7 +37,7 @@ impl<'a> Uri<'a> {
                 display_name: None,
                 user,
                 scheme,
-                host: host,
+                host,
                 port: port.parse::<u16>().unwrap(),
                 params: None,
             },

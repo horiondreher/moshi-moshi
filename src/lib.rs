@@ -79,10 +79,11 @@ impl Call {
         )?;
         write!(response, "Content-Length: 0\r\n\r\n")?;
 
-        return Ok(response);
+        Ok(response)
     }
 }
 
+#[derive(Default)]
 pub struct Calls {
     sip_calls: HashMap<String, Call>,
 }
@@ -104,7 +105,7 @@ impl<'a> Calls {
             Err(_e) => return Err(SipError::ResponseMessage),
         };
 
-        let response = self.handle_request(&src_socket, &message);
+        let response = self.handle_request(src_socket, &message);
 
         Ok(response)
     }
@@ -124,7 +125,7 @@ impl<'a> Calls {
                         state: CallState::Initializing,
                         cseq: 0,
                         call_id: call_id.to_owned(),
-                        source: src.clone(),
+                        source: *src,
                     },
                 );
                 self.sip_calls.get_mut(call_id).unwrap()
@@ -177,6 +178,6 @@ impl<'a> Calls {
             return self.sip_calls.get_mut(x.value);
         }
 
-        return None;
+        None
     }
 }
